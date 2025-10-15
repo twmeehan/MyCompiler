@@ -78,7 +78,7 @@ impl Scanner {
                 }
                 None => Token::EOF,
                 Some(other) => {
-                    eprintln!("Warning: unexpected character '{}' at position {}", other, self.pos);
+                    println!("Warning: unexpected character '{}' at position {}", other, self.pos);
                     Token::Error(other)
                 }
             };

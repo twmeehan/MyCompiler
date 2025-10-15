@@ -11,7 +11,7 @@ pub struct ParseError {
 }
 
 pub fn report_error(errors: &mut Vec<ParseError>, msg: &str) {
-    eprintln!("Parse error: {}", msg);
+    println!("Parse error: {}", msg);
     errors.push(ParseError {
         message: msg.to_string(),
     });

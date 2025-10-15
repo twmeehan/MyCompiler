@@ -14,6 +14,7 @@ use std::io::{self, BufRead};
 use std::collections::VecDeque;
 use dag::DagBuilder;
 use llvm::LLVM;
+use std::io::Write;
 
 
 fn main() {
@@ -49,10 +50,12 @@ fn main() {
             report_error(&mut errors, "Extra or unmatched tokens after valid expression");
         }
         if !errors.is_empty() {
-            eprintln!("\nErrors encountered:");
+            println!("\nErrors encountered:");
             for e in &errors {
-                eprintln!("- {}", e.message);
+                println!("- {}", e.message);
             }
+            let mut file = File::create("first.ll").expect("Failed to create LLVM file");
+            writeln!(file, "; Unable to parse input").unwrap();
         } else {
             println!("AST");
             ast.print();

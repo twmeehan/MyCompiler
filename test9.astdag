@@ -1,0 +1,10 @@
+Warning: unexpected character '&' at position 3
+Warning: unexpected character '-' at position 11
+Warning: unexpected character ':' at position 23
+Parse error: Invalid character '&' in term
+Parse error: Extra or unmatched tokens after valid expression
+
+Errors encountered:
+- Invalid character '&' in term
+- Extra or unmatched tokens after valid expression
+

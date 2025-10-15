@@ -12,7 +12,7 @@ pub struct DagNode {
 #[derive(Default)]
 pub struct DagBuilder {
     pub nodes: Vec<DagNode>,
-    pub map: HashMap<String, usize>, // expression → node id
+    pub map: HashMap<String, usize>, 
     next_id: usize,
 }
 
@@ -21,8 +21,7 @@ impl DagBuilder {
         DagBuilder::default()
     }
 
-    /// Build DAG from the given AST root.
-    /// Returns the ID of the root node.
+    // get DAG from AST
     pub fn from_ast(&mut self, ast: &AstNode) -> usize {
         match ast {
             AstNode::Identifier(id) => self.make_leaf(id),
@@ -54,7 +53,7 @@ impl DagBuilder {
 
     fn make_leaf(&mut self, label: &str) -> usize {
         if let Some(&id) = self.map.get(label) {
-            return id; // reuse existing leaf
+            return id;
         }
         let id = self.next_id;
         self.next_id += 1;
@@ -68,10 +67,12 @@ impl DagBuilder {
         id
     }
 
+    // follow bst
     pub fn print(&self, root_id: usize) {
         use std::collections::{HashSet, VecDeque};
     
         let mut queue = VecDeque::new();
+        // keep track of visited so we dont print duplicates
         let mut visited = HashSet::new();
         queue.push_back(root_id);
         visited.insert(root_id);
@@ -100,12 +101,4 @@ impl DagBuilder {
         }
     }
 
-    pub fn print_debug(&self) {
-        for n in &self.nodes {
-            println!(
-                "id={} label={} left={:?} right={:?}",
-                n.id, n.label, n.left, n.right
-            );
-        }
-    }
 }
