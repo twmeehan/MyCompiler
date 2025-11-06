@@ -1,249 +1,210 @@
 use crate::scanner::Token;
 use std::collections::VecDeque;
 
-pub struct ParseTree {
-    pub label: String,
-    pub children: Vec<ParseTree>,
-}
-
-pub struct ParseError {
-    pub message: String,
-}
-
-pub fn report_error(errors: &mut Vec<ParseError>, msg: &str) {
-    println!("Parse error: {}", msg);
-    errors.push(ParseError {
-        message: msg.to_string(),
-    });
-}
-
-impl ParseTree {
-    pub fn new(label: &str) -> ParseTree {
-        ParseTree {
-            label: label.to_string(),
-            children: Vec::new(),
-        }
-    }
-
-    pub fn print(&self) {
-        // Breadth-first traversal
-        let mut queue: Vec<&ParseTree> = vec![self];
-        while !queue.is_empty() {
-            let mut next: Vec<&ParseTree> = Vec::new();
-            for node in &queue {
-                print!("{} ", node.label);
-                for child in &node.children {
-                    next.push(child);
-                }
-            }
-            println!();
-            queue = next;
-        }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum AstNode {
-    Number(String),
-    Identifier(String),
+    Program {
+        args: Vec<String>,
+        vars: Vec<String>,
+        body: Vec<AstNode>,
+        ret: String,
+    },
+    Assign { name: String, expr: Box<AstNode> },
+    If {
+        cond: Box<AstNode>,
+        then_body: Vec<AstNode>,
+        else_body: Vec<AstNode>,
+    },
+    While {
+        cond: Box<AstNode>,
+        body: Vec<AstNode>,
+    },
     BinaryOp {
         op: String,
         left: Box<AstNode>,
         right: Box<AstNode>,
     },
+    BoolLiteral(bool),
+    Identifier(String),
+    Number(String),
     Empty,
     Error,
 }
 
-impl AstNode {
-    // Breadth-first traversal like parse tree
-    pub fn print(&self) {
-        use std::collections::VecDeque;
-        let mut queue = VecDeque::new();
-        queue.push_back(self.clone());
+pub struct Parser {
+    tokens: VecDeque<Token>,
+    pub errors: Vec<String>,
+    pub ast: Option<AstNode>,
+}
 
-        while !queue.is_empty() {
-            let mut next = VecDeque::new();
+impl Parser {
+    pub fn new(tokens: &[Token]) -> Self {
+        let mut parser = Parser {
+            tokens: VecDeque::from(tokens.to_vec()),
+            errors: Vec::new(),
+            ast: None,
+        };
 
-            for node in queue.iter() {
-                match node {
-                    AstNode::BinaryOp { op, left, right } => {
-                        print!("{} ", op);
-                        next.push_back(*left.clone());
-                        next.push_back(*right.clone());
-                    }
-                    AstNode::Identifier(id) => print!("{} ", id),
-                    AstNode::Number(n) => print!("{} ", n),
-                    AstNode::Empty => print!("ε "),
-                    AstNode::Error => print!("ERROR "),
-                }
-            }
-
-            println!();
-            queue = next;
+        let result = parser.parse_program();
+        if parser.errors.is_empty() {
+            parser.ast = Some(result);
         }
+        parser
     }
-}
 
-
-// EXPR -> TERM EXPRDASH
-pub fn parse_expr(mut tokens: VecDeque<Token>, errors: &mut Vec<ParseError>) -> (ParseTree, AstNode, VecDeque<Token>) {
-    let mut node = ParseTree::new("EXPR");
-
-    let (term_node, term_ast, tokens_after_term) = parse_term(tokens, errors);
-    node.children.push(term_node);
-
-    let (exprdash_node, expr_ast, tokens_after_exprdash) = parse_exprdash(tokens_after_term, errors, term_ast.clone());
-    node.children.push(exprdash_node);
-
-    (node, expr_ast, tokens_after_exprdash)
-}
-
-// EXPRDASH -> + TERM EXPRDASH | EPSILON 
-fn parse_exprdash(mut tokens: VecDeque<Token>, errors: &mut Vec<ParseError>, left_ast: AstNode) -> (ParseTree, AstNode, VecDeque<Token>) {
-    let mut node = ParseTree::new("EXPRDASH");
-
-    match tokens.front() {
-        Some(Token::Plus) => {
-            tokens.pop_front();
-            node.children.push(ParseTree::new("PLUS"));
-
-            let (term_node, term_ast, tokens_after_term) = parse_term(tokens, errors);
-            node.children.push(term_node);
-
-            let combined = AstNode::BinaryOp {
-                op: "+".to_string(),
-                left: Box::new(left_ast),
-                right: Box::new(term_ast),
-            };
-
-            let (exprdash_node, next_ast, tokens_after_exprdash) = parse_exprdash(tokens_after_term, errors, combined.clone());
-            node.children.push(exprdash_node);
-
-            (node, next_ast, tokens_after_exprdash)
-        }
-        Some(Token::Error(ch)) => {
-            report_error(errors, &format!("Invalid character '{}' in expression", ch));
-            tokens.pop_front();
-            node.children.push(ParseTree::new("ERROR"));
-            (node, AstNode::Error, tokens)
-        }
-        _ => {
-            node.children.push(ParseTree::new("EPSILON"));
-            (node, left_ast, tokens)
-        }
-    }
-}
-
-// TERM -> FACTOR TERMDASH
-fn parse_term(mut tokens: VecDeque<Token>, errors: &mut Vec<ParseError>) -> (ParseTree, AstNode, VecDeque<Token>) {
-    let mut node = ParseTree::new("TERM");
-
-    let (factor_node, factor_ast, tokens_after_factor) = parse_factor(tokens, errors);
-    node.children.push(factor_node);
-
-    let (termdash_node, term_ast, tokens_after_termdash) = parse_termdash(tokens_after_factor, errors, factor_ast.clone());
-    node.children.push(termdash_node);
-
-    (node, term_ast, tokens_after_termdash)
-}
-
-// TERMDASH -> * FACTOR TERMDASH | EPSILON
-fn parse_termdash(mut tokens: VecDeque<Token>, errors: &mut Vec<ParseError>, left_ast: AstNode) -> (ParseTree, AstNode, VecDeque<Token>) {
-    let mut node = ParseTree::new("TERMDASH");
-
-    match tokens.front() {
-        Some(Token::Star) => {
-            tokens.pop_front();
-            node.children.push(ParseTree::new("STAR"));
-
-            let (factor_node, factor_ast, tokens_after_factor) = parse_factor(tokens, errors);
-            node.children.push(factor_node);
-
-            let combined = AstNode::BinaryOp {
-                op: "*".to_string(),
-                left: Box::new(left_ast),
-                right: Box::new(factor_ast),
-            };
-
-            let (termdash_node, term_ast, tokens_after_termdash) = parse_termdash(tokens_after_factor, errors, combined.clone());
-            node.children.push(termdash_node);
-
-            (node, term_ast, tokens_after_termdash)
-        }
-        Some(Token::Error(ch)) => {
-            report_error(errors, &format!("Invalid character '{}' in term", ch));
-            tokens.pop_front();
-            node.children.push(ParseTree::new("ERROR"));
-            (node, AstNode::Error, tokens)
-        }
-        _ => {
-            node.children.push(ParseTree::new("EPSILON"));
-            (node, left_ast, tokens)
-        }
-    }
-}
-
-// FACTOR -> IDENTIFIER | NUMBER | ( EXPR )
-fn parse_factor(mut tokens: VecDeque<Token>, errors: &mut Vec<ParseError>) -> (ParseTree, AstNode, VecDeque<Token>) {
-    let mut node = ParseTree::new("FACTOR");
-
-    let next = tokens.front().cloned(); // <-- clone the front token before match
-    match next {
-        Some(Token::Identifier(name)) => {
-            node.children.push(ParseTree::new(&format!("IDENTIFIER({})", name)));
-            tokens.pop_front();
-            (node, AstNode::Identifier(name), tokens)
-        }
-        Some(Token::Number(val)) => {
-            node.children.push(ParseTree::new(&format!("NUMBER({})", val)));
-            tokens.pop_front();
-            (node, AstNode::Number(val), tokens)
-        }
-        Some(Token::BOpen) => {
-            tokens.pop_front();
-            node.children.push(ParseTree::new("BOPEN"));
-
-            let (expr_node, expr_ast, tokens_after_expr) = parse_expr(tokens, errors);
-            node.children.push(expr_node);
-
-            let mut t = tokens_after_expr;
-            match t.front() {
-                Some(Token::BClose) => {
-                    node.children.push(ParseTree::new("BCLOSE"));
-                    t.pop_front();
-                    (node, expr_ast, t)
-                }
-                other => {
-                    report_error(errors, &format!("Expected ')' but found {:?}", other));
-                    node.children.push(ParseTree::new("ERROR"));
-                    (node, AstNode::Error, t)
-                }
+    fn peek(&self) -> Option<&Token> {self.tokens.front()}
+    fn advance(&mut self) -> Option<Token> {self.tokens.pop_front()}
+    fn error(&mut self, msg: &str) { self.errors.push(msg.to_string());}
+    fn expect(&mut self, expected: &Token, msg: Option<&str>) -> bool {
+        if let Some(token) = self.peek() {
+            if token == expected {
+                self.advance();
+                return true;
             }
         }
-        Some(Token::BClose) => {
-            report_error(errors, "Unmatched ')'");
-            node.children.push(ParseTree::new("ERROR"));
-            tokens.pop_front();
-            (node, AstNode::Error, tokens)
+        if let Some(m) = msg {
+            self.error(m);
+        } else {
+            self.error(&format!("Expected {:?} but found {:?}", expected, self.peek()));
         }
-        Some(Token::Error(ch)) => {
-            report_error(errors, &format!("Invalid character '{}' in factor", ch));
-            node.children.push(ParseTree::new("ERROR"));
-            tokens.pop_front();
-            (node, AstNode::Error, tokens)
+        false
+    }
+
+    // PROG -> ARGDECL TYPEDECL STMTS RET
+    fn parse_program(&mut self) -> AstNode {
+        let args = self.parse_argdecl();
+        let vars = vec![];//self.parse_typedecl();
+        let body = vec![];//self.parse_stmts();
+        let ret = self.parse_ret();
+        if self.errors.is_empty() {
+            AstNode::Program { args, vars, body, ret }
+        } else {
+            AstNode::Error
         }
-        Some(Token::EOF) | None => {
-            report_error(errors, "Unexpected end of input while parsing factor");
-            node.children.push(ParseTree::new("ERROR"));
-            (node, AstNode::Error, tokens)
-        }
-        Some(t) => {
-            report_error(errors, &format!("Unexpected token in factor: {:?}", t));
-            node.children.push(ParseTree::new("ERROR"));
-            tokens.pop_front();
-            (node, AstNode::Error, tokens)
+        AstNode::Program { args, vars, body, ret }
+    }
+
+    // ARGDECL -> args IDENTIFIER ARGDECLTAIL
+    fn parse_argdecl(&mut self) -> Vec<String> {
+        self.expect(&Token::Args, "Missing 'args' declaration"); 
+        let mut args = Vec::new();
+        self.parse_argdecltail(&mut args);
+        args
+    }
+
+    // ARGDECLTAIL -> ; | IDENTIFIER ARGDECLTAIL
+    fn parse_argdecltail(&mut self, args: &mut Vec<String>) {
+        match self.advance() {
+            Some(Token::Identifier(name)) => {
+                args.push(name);
+                self.parse_argdecltail(args);
+            }
+            Some(Token::Semicolon) => {
+                return;
+            }
+            _ => {
+                self.error("Unexpected syntax in argument declaration");
+                return;
+            }
         }
     }
-}
+    
+    // RET -> return IDENTIFER ;
+    fn parse_ret(&mut self) -> String {
+        self.expect(&Token::Return, "Missing 'return' statement");
+        // this could be EXPR instead of IDENTIFIER
+        let ret_name = if let Some(Token::Identifier(name)) = self.advance() {
+            name
+        } else {
+            self.error("Expected identifier after 'return'");
+            "".to_string()
+        };
+        self.expect(&Token::Semicolon);
+        ret_name
+    }
 
+
+    // fn parse_expr(&mut self) -> AstNode {
+    //     let mut left = self.parse_term();
+
+    //     loop {
+    //         match self.peek() {
+    //             Some(Token::Plus) => {
+    //                 self.advance();
+    //                 let right = self.parse_term();
+    //                 left = AstNode::BinaryOp {
+    //                     op: "+".into(),
+    //                     left: Box::new(left),
+    //                     right: Box::new(right),
+    //                 };
+    //             }
+    //             Some(Token::Minus) => {
+    //                 self.advance();
+    //                 let right = self.parse_term();
+    //                 left = AstNode::BinaryOp {
+    //                     op: "-".into(),
+    //                     left: Box::new(left),
+    //                     right: Box::new(right),
+    //                 };
+    //             }
+    //             _ => break,
+    //         }
+    //     }
+
+    //     left
+    // }
+
+    // fn parse_term(&mut self) -> AstNode {
+    //     let mut left = self.parse_factor();
+
+    //     loop {
+    //         match self.peek() {
+    //             Some(Token::Star) => {
+    //                 self.advance();
+    //                 let right = self.parse_factor();
+    //                 left = AstNode::BinaryOp {
+    //                     op: "*".into(),
+    //                     left: Box::new(left),
+    //                     right: Box::new(right),
+    //                 };
+    //             }
+    //             _ => break,
+    //         }
+    //     }
+
+    //     left
+    // }
+
+    // fn parse_factor(&mut self) -> AstNode {
+    //     match self.advance() {
+    //         Some(Token::Identifier(id)) => AstNode::Identifier(id),
+    //         Some(Token::Number(n)) => AstNode::Number(n),
+
+    //         Some(Token::BOpen) => {
+    //             let expr = self.parse_expr();
+    //             match self.advance() {
+    //                 Some(Token::BClose) => expr,
+    //                 other => {
+    //                     self.error(format!("Expected ')', found {:?}", other));
+    //                     AstNode::Error
+    //                 }
+    //             }
+    //         }
+
+    //         Some(Token::Error(ch)) => {
+    //             self.error(format!("Invalid character '{}'", ch));
+    //             AstNode::Error
+    //         }
+
+    //         Some(Token::EOF) | None => {
+    //             self.error("Unexpected end of input");
+    //             AstNode::Error
+    //         }
+
+    //         Some(t) => {
+    //             self.error(format!("Unexpected token: {:?}", t));
+    //             AstNode::Error
+    //         }
+    //     }
+    // }
+}
