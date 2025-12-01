@@ -1,0 +1,17 @@
+args a;
+int b, c;
+c = 0;
+if a < 4 then
+{
+b = 4;
+}
+else
+{
+b = 6;
+}
+while b < 10 then
+{
+c = c + a;
+b = b + 1;
+}
+return c;

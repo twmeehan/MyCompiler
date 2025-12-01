@@ -1,0 +1,7 @@
+args x ;
+int y ;
+else
+{
+y = x;
+}
+return y;

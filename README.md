@@ -1,2 +1,0 @@
-Timothy Meehan
-twm70

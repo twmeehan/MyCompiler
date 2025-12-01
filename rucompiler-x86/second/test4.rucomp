@@ -1,0 +1,17 @@
+args n ;
+int count, total ;
+count = 0;
+total = 0;
+while count < n then
+{
+if count < 5 then
+{
+total = total + count;
+}
+else
+{
+total = total + n;
+}
+count = count + 1;
+}
+return total;

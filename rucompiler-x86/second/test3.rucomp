@@ -1,0 +1,11 @@
+args a, b ;
+int diff ;
+if a > b then
+{
+diff = a - b;
+}
+else
+{
+diff = b - a;
+}
+return diff;

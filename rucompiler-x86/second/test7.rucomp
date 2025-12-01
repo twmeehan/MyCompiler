@@ -1,0 +1,11 @@
+args n ;
+int out ;
+if n > 0
+{
+out = n;
+}
+else
+{
+out = 0;
+}
+return out;

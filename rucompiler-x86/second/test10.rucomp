@@ -1,0 +1,4 @@
+args a ;
+int b ;
+b = a + 2
+return b;

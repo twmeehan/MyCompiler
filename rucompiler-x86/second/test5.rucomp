@@ -1,0 +1,17 @@
+args n, m ;
+int acc ;
+acc = 0;
+if m < 0 then
+{
+m = 0;
+}
+else
+{
+m = m;
+}
+while n > 0 then
+{
+acc = acc + m;
+n = n - 1;
+}
+return acc;
